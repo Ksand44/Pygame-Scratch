@@ -6,6 +6,10 @@ import random
 import time
 from copy import copy
 
+#########################################################################################
+# game Class 																			#
+#########################################################################################
+
 class game():
 	def __init__(self, width, height, background=None):
 		self.sprites = []
@@ -21,10 +25,15 @@ class game():
 		self.keyList = None
 		self.stage = None
 
+		self.frame_count = 0
+
 		self.pen_surface = pygame.surface.Surface((width, height))
 		self.pen_surface.fill(Color("white"))
 
 		self.show_hit_box = False
+
+		self.default_costume = None
+		self.load_default_costume()
 
 
 	@property
@@ -35,10 +44,14 @@ class game():
 	def h(self):
 		return self.height
 	
+	@property
+	def time(self):
+		return pygame.time.get_ticks()
 	
 	@property
 	def background(self):
 		return self._background
+
 
 	@background.setter
 	def background(self, background):
@@ -85,7 +98,7 @@ class game():
 				self.stage.wait_tick()
 			else:
 				self.stage.update()
-		
+
 		for s in self.sprites:
 			if s.waiting:
 				s.wait_tick()
@@ -106,6 +119,16 @@ class game():
 
 	def add_sprite(self, sprite):
 		self.sprites.append(sprite)
+
+	def load_default_costume(self):
+		default_costume = os.path.join("Costumes", "Scratch_Cat.png")
+
+		if os.path.isfile(default_costume):
+			self.default_costume = pygame.image.load(default_costume).convert_alpha()
+		else:
+			print("Scratch_Cat missing from \\Costumes folder")
+			print("	 Make sure you have a Costumes folder")
+			print("  that contains .png files of your costumes")
 
 
 #########################################################################################
@@ -140,7 +163,13 @@ class scratchSprite():
 		self._size = 100
 
 		#Looks
+		self.costumes = {}
+
+		default_costume = "Scratch_Cat.png"
+		self.load_costume(default_costume)
+
 		self.costume = costume
+		
 
 		self.size = size
 		self.direc = direc
@@ -160,6 +189,7 @@ class scratchSprite():
 
 		self.wait_time = 0
 		self.waiting = False
+
 
 	@property
 	def x(self):
@@ -204,27 +234,17 @@ class scratchSprite():
 		self.size_costume()
 
 	@costume.setter
-	def costume(self, costume):
-		default_costume = os.path.join("Costumes", "Scratch_Cat.png")
-
-		if costume is None:
-			if os.path.isfile(default_costume):
-				self._costume = pygame.image.load(default_costume).convert_alpha()
+	def costume(self, costume_name):
+		if costume_name is None:
+			if self.game.default_costume is not None:
+				self.costumes["Scratch_Cat.png"] = self.game.default_costume
+				self._costume = self.costumes["Scratch_Cat.png"]
 			else:
-				print("Scratch_Cat missing from data folder")
+				self._costume = None
+		elif costume_name in self.costumes:
+			self._costume = self.costumes[costume_name]
 		else:
-			costume_path = os.path.join("Costumes", costume)
-			if os.path.isfile(costume_path):
-				self._costume = pygame.image.load(costume_path).convert_alpha()
-			elif os.path.isfile(default_costume):
-				print("Invalid costume name {}, using default Scratch_Cat, try:".format(costume))
-				list_costumes = os.listdir("Costumes")
-				del list_costumes[-1]
-				print(list_costumes)
-				self._costume = pygame.image.load(default_costume).convert_alpha()
-				costume = os.path.join("Costumes", costume)
-			else:
-				print("Scratch_Cat missing from data folder")
+			self.load_costume(costume_name)
 
 		self.costume_rect = self.costume.get_rect()
 		self.size_costume()
@@ -235,16 +255,26 @@ class scratchSprite():
 		direc = (direc + 180) % 360 - 180
 		self._direc = direc
 		self.rotate_costume()
-		
+	
 
-	def wait_tick(self):
-		self.wait_time -= 1
-		if self.wait_time <= 0:
-			self.waiting = False
+	def load_costume(self, costume_name):
+		costume_path = os.path.join("Costumes", costume_name)
 
-	def wait(self, time):
-		self.wait_time = time
-		self.waiting = True
+		if os.path.isfile(costume_path):
+			self.costumes[costume_name] = pygame.image.load(costume_path).convert_alpha()
+			self._costume = self.costumes[costume_name]
+		else:
+			print("Invalid costume name {}, try".format(costume_name))
+			list_costumes = os.listdir("Costumes")
+			del list_costumes[-1]
+			print(list_costumes)
+
+			if self.game.default_costume is not None:
+				self.costumes["Scratch_Cat.png"] = self.game.default_costume
+				self._costume = self.costumes["Scratch_Cat.png"]
+			else:
+				self._costume = None
+
 
 	def update(self):
 		# Blank update function, for testing
@@ -257,7 +287,8 @@ class scratchSprite():
 				win.blit(self.costume_blit, self.rect.topleft)
 			else:
 				# Draw a rectangle to the screen
-				pygame.draw.rect(win, Color("blue"), (self.rect.x, self.rect.y, 30, 30))
+				default_rect = (self.rect.x, self.rect.y, 30, 30)
+				pygame.draw.rect(win, Color("blue"), default_rect)
 
 		if self.game.show_hit_box:
 			rect_draw = (self.rect.x, self.rect.y, self.rect.w, self.rect.h)
@@ -268,15 +299,15 @@ class scratchSprite():
 			pass
 
 	def size_costume(self):
-		scale = self.size / 100
-		scale_w = int(self.costume_rect.w * scale)
-		scale_h = int(self.costume_rect.h * scale)
+		scale_w = int(self.costume_rect.w * self.size / 100)
+		scale_h = int(self.costume_rect.h * self.size / 100)
+		scale = (scale_w, scale_h)
 		
-		if scale != 100:
+		if self.size != 100:
 			try:
-				self.costume_size = pygame.transform.smoothscale(self.costume, (scale_w, scale_h))
+				self.costume_size = pygame.transform.smoothscale(self.costume, scale)
 			except:
-				self.costume_size = pygame.transform.scale(self.costume, (scale_w, scale_h))
+				self.costume_size = pygame.transform.scale(self.costume, scale)
 		else:
 			self.costume_size = copy(self.costume)
 
@@ -294,10 +325,13 @@ class scratchSprite():
 			else:
 				self.costume_blit = copy(self.costume_size)
 		else:
-			self.costume_blit = pygame.transform.rotate(self.costume_size, (self.direc - 90) * -1)
+			rotate_angle = (self.direc - 90) * -1
+			self.costume_blit = pygame.transform.rotate(self.costume_size, rotate_angle)
 		
 		self.mask_align()
 
+
+	# Looks
 
 	def show(self):
 		self.visible = True
@@ -310,6 +344,8 @@ class scratchSprite():
 		self.mask = pygame.mask.from_surface(self.costume_blit)
 		self.rect.center = self.pos
 		
+
+	# Motion
 
 	def move(self, steps):
 		self.start_pen = self.pos
@@ -337,6 +373,9 @@ class scratchSprite():
 	def point_in_direc(self, deg):
 		self.direc = deg % 360
 
+	def point_towards(self, other):
+		self.point_in_direc(self.direction_to(other))
+
 	def goto(self, x, y=None):
 		if y is None:
 			self.x, self.y = x
@@ -359,18 +398,28 @@ class scratchSprite():
 
 
 	def edge_bounce(self):
-		padding = 5
-		if self.rect.left <= padding or self.rect.right >= self.game.w - padding:
+		padding = -10
+		if self.rect.left <= padding:
 			self.direc *= -1
-			if self.direc < 0:
-				pass
-			else:
-				pass
-		if self.rect.top <= padding or self.rect.bottom >= self.game.h - padding:
+			self.x += 5
+
+		if self.rect.right >= self.game.w - padding:
+			self.direc *= -1
+			self.x -= 5
+
+		if self.rect.top <= padding:
 			if self.direc > 0:
 				self.direc = 180 - self.direc
 			else:
 				self.direc = -180 - self.direc
+			self.y += 5
+
+		if self.rect.bottom >= self.game.h - padding:
+			if self.direc > 0:
+				self.direc = 180 - self.direc
+			else:
+				self.direc = -180 - self.direc
+			self.y -= 5
 
 	def edge_collision(self):
 		if self.rect.right >= self.game.w:
@@ -415,7 +464,8 @@ class scratchSprite():
 				returnVec[0] = 0
 		return returnVec
 
-	# PEN SCRIPTS
+
+	# Pen
 
 	def clear(self):
 		self.pen_surface.blit(self.background, (0, 0))
@@ -438,6 +488,32 @@ class scratchSprite():
 						   True)
 
 
+	# Control
+
+	def wait_tick(self):
+		if self.wait_time <= self.game.time:
+			self.waiting = False
+
+	def wait(self, time):
+		self.wait_time = self.game.time + time
+		self.waiting = True
+
+
+	# Sensing
+
+	def direction_to(self, other):
+		new_pos = (self.x - other.x, self.y - other.y)
+		returnAngle = math.degrees(math.atan2(new_pos[1], new_pos[0]))
+		# returnAngle *= -1
+		returnAngle -= 90
+		return returnAngle
+
+
+#########################################################################################
+# stage class 																			#
+#########################################################################################
+
+
 class stage():
 	def __init__(self, game):
 		self.game = game
@@ -447,12 +523,11 @@ class stage():
 		self.waiting = False
 
 	def wait_tick(self):
-		self.wait_time -= 1
-		if self.wait_time <= 0:
+		if self.wait_time <= self.game.time:
 			self.waiting = False
 
 	def wait(self, time):
-		self.wait_time = time
+		self.wait_time = self.game.time + time
 		self.waiting = True
 
 

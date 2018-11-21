@@ -62,21 +62,29 @@ hide()
 move(steps)
 right(deg), turn_right(deg)
 left(deg), turn_left(deg)
-point_in_direc(deg)
+
 goto(x, y)
 goto_random()
+
+point_in_direc(deg)
+point_towards(other)
+
 edge_bounce()
 
 distance_to(other)
 touching(other)
 
-direction_to()
+direction_to(other)
 
 # Pen
 clear()
 stamp()
 pen_down()
 pen_up()
+
+# Control
+wait(milliseconds) # 1000 milliseconds in 1 sec
+
 
 
 # Debugging
